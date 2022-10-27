@@ -3,6 +3,7 @@ import sys
 import snowflake.connector
 import re
 import time
+import requests
 
 from typing import List, Dict, Union, Tuple, Set
 from singer import get_logger
@@ -21,8 +22,6 @@ def validate_config(config):
     s3_required_config_keys = [
         'account',
         'dbname',
-        'user',
-        'password',
         'warehouse',
         's3_bucket',
         'stage',
@@ -32,8 +31,6 @@ def validate_config(config):
     snowflake_required_config_keys = [
         'account',
         'dbname',
-        'user',
-        'password',
         'warehouse',
         'file_format'
     ]
@@ -285,12 +282,55 @@ class DbSync:
         else:
             self.upload_client = SnowflakeUploadClient(connection_config, self)
 
-    def open_connection(self):
-        """Open snowflake connection"""
-        stream = None
-        if self.stream_schema_message:
-            stream = self.stream_schema_message['stream']
+    def refresh_token(self):
+        """Connect to snowflake database"""
+        payload = {
+            "client_id": f'{self.connection_config["client_id"]}',
+            "refresh_token": self.connection_config["refresh_token"],
+            "grant_type": "refresh_token",
+        }
+        url = f"https://{self.connection_config['account']}.snowflakecomputing.com/oauth/token-request"
+        auth = requests.auth.HTTPBasicAuth(self.connection_config["client_id"], self.connection_config["client_secret"])
+        token_response = requests.post(url, data=payload, auth=auth)
+        token_response = token_response.json()
+        if token_response.get("error"):
+            raise ConnectionError(token_response["message"])
+        self.connection_config['access_token'] = token_response.get('access_token')
 
+    def get_conn_creds(self, stream):
+        return dict(
+            account=self.connection_config['account'],
+            authenticator="oauth",
+            token=self.connection_config['access_token'],
+            warehouse=self.connection_config['warehouse'],
+            database=self.connection_config['dbname'],
+            insecure_mode=self.connection_config.get('insecure_mode', False),
+            autocommit=True,
+            session_parameters={
+                # Quoted identifiers should be case sensitive
+                'QUOTED_IDENTIFIERS_IGNORE_CASE': 'FALSE',
+                'QUERY_TAG': create_query_tag(self.connection_config.get('query_tag'),
+                                            database=self.connection_config['dbname'],
+                                            schema=self.schema_name,
+                                            table=self.table_name(stream, False, True))
+            }
+        )
+
+    def open_connection_oauth(self, stream):
+        """Connect to snowflake database"""
+        try:
+            connector = self.get_conn_creds(stream)
+            return snowflake.connector.connect(**connector)
+        except snowflake.connector.errors.DatabaseError as e:
+            if "OAuth access token expired" in str(e):
+                self.logger.info("Access token expired, attempting to refresh.")
+                self.refresh_token()
+            connector = self.get_conn_creds(stream)
+            return snowflake.connector.connect(**connector)
+
+
+
+    def user_connection(self, stream):
         return snowflake.connector.connect(
             user=self.connection_config['user'],
             password=self.connection_config['password'],
@@ -308,6 +348,16 @@ class DbSync:
                                               table=self.table_name(stream, False, True))
             }
         )
+
+    def open_connection(self):
+        """Open snowflake connection"""
+        stream = None
+        if self.stream_schema_message:
+            stream = self.stream_schema_message['stream']
+
+        if not self.connection_config.get('access_token'):
+            return self.user_connection(stream)
+        return self.open_connection_oauth(stream)
 
     def query(self, query: Union[str, List[str]], params: Dict = None, max_records=0) -> List[Dict]:
         """Run an SQL query in snowflake"""
