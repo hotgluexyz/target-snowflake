@@ -47,7 +47,7 @@ def create_merge_sql(table_name: str,
 
 def record_to_csv_line(record: dict,
                        schema: dict,
-                       data_flattening_max_level: int = 0) -> str:
+                       data_flattening_max_level: int = 0, delimiter = ",") -> str:
     """
     Transforms a record message to a CSV line
 
@@ -61,7 +61,7 @@ def record_to_csv_line(record: dict,
     """
     flatten_record = flattening.flatten_record(record, schema, max_level=data_flattening_max_level)
 
-    return ','.join(
+    return delimiter.join(
         [
             json.dumps(flatten_record[column], ensure_ascii=False) if column in flatten_record and (
                     flatten_record[column] == 0 or flatten_record[column]) else ''
@@ -74,7 +74,8 @@ def write_records_to_file(outfile,
                           records: Dict,
                           schema: Dict,
                           record_to_csv_line_transformer: Callable,
-                          data_flattening_max_level: int = 0) -> None:
+                          data_flattening_max_level: int = 0,
+                          delimiter=",") -> None:
     """
     Writes a record message to a given file
 
@@ -89,7 +90,7 @@ def write_records_to_file(outfile,
         None
     """
     for record in records.values():
-        csv_line = record_to_csv_line_transformer(record, schema, data_flattening_max_level)
+        csv_line = record_to_csv_line_transformer(record, schema, data_flattening_max_level,delimiter)
         outfile.write(bytes(csv_line + '\n', 'UTF-8'))
 
 
@@ -99,7 +100,8 @@ def records_to_file(records: Dict,
                     prefix: str = 'batch_',
                     compression: bool = False,
                     dest_dir: str = None,
-                    data_flattening_max_level: int = 0):
+                    data_flattening_max_level: int = 0,
+                    delimiter=","):
     """
     Transforms a list of dictionaries with records messages to a CSV file
 
@@ -129,9 +131,9 @@ def records_to_file(records: Dict,
     if compression:
         with open(filedesc, 'wb') as outfile:
             with gzip.GzipFile(filename=filename, mode='wb',fileobj=outfile) as gzipfile:
-                write_records_to_file(gzipfile, records, schema, record_to_csv_line, data_flattening_max_level)
+                write_records_to_file(gzipfile, records, schema, record_to_csv_line, data_flattening_max_level,delimiter)
     else:
         with open(filedesc, 'wb') as outfile:
-            write_records_to_file(outfile, records, schema, record_to_csv_line, data_flattening_max_level)
+            write_records_to_file(outfile, records, schema, record_to_csv_line, data_flattening_max_level,delimiter)
 
     return filename
