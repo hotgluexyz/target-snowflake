@@ -85,7 +85,7 @@ def get_snowflake_statics(config):
 
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements,invalid-name
-def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatTypes = None) -> None:
+def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatTypes = None, delimiter = ",") -> None:
     """Main loop to read and consume singer messages from stdin
 
     Params:
@@ -388,6 +388,7 @@ def flush_streams(
             no_compression=config.get('no_compression'),
             delete_rows=config.get('hard_delete'),
             temp_dir=config.get('temp_dir'),
+            delimiter=config.get('delimiter', ","),
             archive_load_files=copy.copy(archive_load_files_data.get(stream, None))
         ) for stream in streams_to_flush)
 
@@ -418,11 +419,11 @@ def flush_streams(
 
 
 def load_stream_batch(stream, records, row_count, db_sync, no_compression=False, delete_rows=False,
-                      temp_dir=None, archive_load_files=None):
+                      temp_dir=None, delimiter=",", archive_load_files=None, ):
     """Load one batch of the stream into target table"""
     # Load into snowflake
     if row_count[stream] > 0:
-        flush_records(stream, records, db_sync, temp_dir, no_compression, archive_load_files)
+        flush_records(stream, records, db_sync, temp_dir, no_compression, archive_load_files, delimiter)
 
         # Delete soft-deleted, flagged rows - where _sdc_deleted at is not null
         if delete_rows:
@@ -437,7 +438,8 @@ def flush_records(stream: str,
                   db_sync: DbSync,
                   temp_dir: str = None,
                   no_compression: bool = False,
-                  archive_load_files: Dict = None) -> None:
+                  archive_load_files: Dict = None,
+                  delimiter=",") -> None:
     """
     Takes a list of record messages and loads it into the snowflake target table
 
@@ -460,7 +462,8 @@ def flush_records(stream: str,
                                                              compression=not no_compression,
                                                              dest_dir=temp_dir,
                                                              data_flattening_max_level=
-                                                             db_sync.data_flattening_max_level)
+                                                             db_sync.data_flattening_max_level,                                                           
+                                                             delimiter=delimiter)
 
     # Get file stats
     row_count = len(records)
