@@ -61,9 +61,12 @@ def record_to_csv_line(record: dict,
     """
     flatten_record = flattening.flatten_record(record, schema, max_level=data_flattening_max_level)
 
+    # NOTE: All the entries need to be stringified to make the join work
     return delimiter.join(
         [
-            flatten_record.get(column) or ""
+            (flatten_record[column] if type(flatten_record[column]) == str else json.dumps(flatten_record[column], ensure_ascii=False))
+            if column in flatten_record
+            else ""
             for column in schema
         ]
     )
