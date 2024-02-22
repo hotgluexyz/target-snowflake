@@ -387,7 +387,8 @@ class DbSync:
                 for q in queries:
 
                     # update the LAST_QID
-                    params['LAST_QID'] = qid
+                    if qid:
+                        params['LAST_QID'] = qid
 
                     self.logger.debug("Running query: '%s' with Params %s", q, params)
 
