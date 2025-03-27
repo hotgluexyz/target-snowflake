@@ -15,6 +15,29 @@ from target_snowflake.exceptions import TooManyRecordsException, PrimaryKeyNotFo
 from target_snowflake.upload_clients.s3_upload_client import S3UploadClient
 from target_snowflake.upload_clients.snowflake_upload_client import SnowflakeUploadClient
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+
+
+
+def convert_private_key_to_der(private_key_str, private_key_password=None):
+    # Convert string to bytes
+    pem_private_key = private_key_str.encode('utf-8')
+    password = private_key_password.encode('utf-8') if private_key_password else None
+
+    # Convert from PEM to DER formats
+    private_key = serialization.load_pem_private_key(
+        pem_private_key,
+        password=password,
+        backend=default_backend()
+    )
+    der_private_key = private_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
+    return der_private_key
 
 def validate_config(config):
     """Validate configuration"""
@@ -195,6 +218,9 @@ class DbSync:
 
         # Validate connection configuration
         config_errors = validate_config(connection_config)
+        if connection_config.get('private_key'):
+            der_key = convert_private_key_to_der(connection_config['private_key'], connection_config.get('private_key_password'))
+            connection_config['private_der_key'] = der_key
 
         # Exit if config has errors
         if len(config_errors) > 0:
@@ -349,12 +375,33 @@ class DbSync:
             }
         )
 
+    def private_key_connection(self, stream):
+        """Connect to snowflake database"""
+        return snowflake.connector.connect(
+            user=self.connection_config['user'],
+            private_key=self.connection_config['private_der_key'],
+            account=self.connection_config['account'],
+            database=self.connection_config['dbname'],
+            warehouse=self.connection_config['warehouse'],
+            autocommit=True,
+            session_parameters={
+                # Quoted identifiers should be case sensitive
+                'QUOTED_IDENTIFIERS_IGNORE_CASE': 'FALSE',
+                'QUERY_TAG': create_query_tag(self.connection_config.get('query_tag'),
+                                              database=self.connection_config['dbname'],
+                                              schema=self.schema_name,
+                                              table=self.table_name(stream, False, True))
+            }
+        )
+
     def open_connection(self):
         """Open snowflake connection"""
         stream = None
         if self.stream_schema_message:
             stream = self.stream_schema_message['stream']
 
+        if self.connection_config.get('private_key'):
+            return self.private_key_connection(stream)        
         if not self.connection_config.get('access_token'):
             return self.user_connection(stream)
         return self.open_connection_oauth(stream)
