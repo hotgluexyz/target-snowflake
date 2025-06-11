@@ -61,6 +61,9 @@ def record_to_csv_line(record: dict,
     """
     flatten_record = flattening.flatten_record(record, schema, max_level=data_flattening_max_level)
 
+    if delimiter == "\\x1F":
+        delimiter = '\x1F'
+
     # NOTE: All the entries need to be stringified to make the join work
     return delimiter.join(
         [

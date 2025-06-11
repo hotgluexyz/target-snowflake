@@ -42,6 +42,9 @@ class FileFormat:
         self.connection_config = connection_config
         delimiter = self.connection_config.get('delimiter', ',')
 
+        if delimiter == "\\x1F":
+            delimiter = '\x1F'
+
         if auto_create_file_format:
             self.logger.info(f"Auto creating file format: {file_format}")
             query_fn(f"""CREATE OR REPLACE FILE FORMAT {file_format}
