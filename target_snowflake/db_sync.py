@@ -92,7 +92,8 @@ def validate_config(config):
 
 def column_type(schema_property):
     """Take a specific schema property and return the snowflake equivalent column type"""
-    property_type = schema_property['type']
+    # TODO: Hard coding it to ignore fuzzy types and just use the first type
+    property_type = [schema_property['type'][0]]
     property_format = schema_property['format'] if 'format' in schema_property else None
     col_type = 'text'
     if 'object' in property_type or 'array' in property_type:
