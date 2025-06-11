@@ -122,7 +122,7 @@ def column_type(schema_property):
 
 def column_trans(schema_property):
     """Generate SQL transformed columns syntax"""
-    property_type = schema_property['type']
+    property_type = [schema_property['type'][0]]
     col_trans = ''
     if 'object' in property_type or 'array' in property_type:
         col_trans = 'parse_json'
