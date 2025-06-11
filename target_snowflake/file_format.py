@@ -27,8 +27,12 @@ class FileFormat:
     def __init__(self, file_format: str, query_fn: Callable, file_format_type: FileFormatTypes=None, logger = None, connection_config = None):
         """Find the file format in Snowflake, detect its type and
         initialise file format specific functions"""
+        auto_create_file_format = self.connection_config.get('auto_create_file_format', None)
+
         if file_format_type:
             self.file_format_type = file_format_type
+        elif auto_create_file_format:
+            self.file_format_type = FileFormatTypes.CSV
         else:
             # Detect file format type by querying it from Snowflake
             self.file_format_type = self._detect_file_format_type(file_format, query_fn)
@@ -38,7 +42,7 @@ class FileFormat:
         self.connection_config = connection_config
         delimiter = self.connection_config.get('delimiter', ',')
 
-        if self.connection_config.get('auto_create_file_format', None):
+        if auto_create_file_format:
             self.logger.info(f"Auto creating file format: {file_format}")
             query_fn(f"""CREATE OR REPLACE FILE FORMAT {file_format}
                 TYPE = 'CSV'
