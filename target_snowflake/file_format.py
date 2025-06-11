@@ -24,7 +24,7 @@ class FileFormatTypes(str, Enum):
 class FileFormat:
     """File Format class"""
 
-    def __init__(self, file_format: str, query_fn: Callable, file_format_type: FileFormatTypes=None, logger = None):
+    def __init__(self, file_format: str, query_fn: Callable, file_format_type: FileFormatTypes=None, logger = None, connection_config = None):
         """Find the file format in Snowflake, detect its type and
         initialise file format specific functions"""
         if file_format_type:
@@ -35,6 +35,16 @@ class FileFormat:
 
         self.formatter = self._get_formatter(self.file_format_type)
         self.logger = logger
+        self.connection_config = connection_config
+        delimiter = self.connection_config.get('delimiter', ',')
+
+        if self.connection_config.get('auto_create_file_format', None):
+            self.logger.info(f"Auto creating file format: {file_format}")
+            query_fn(f"""CREATE OR REPLACE FILE FORMAT {file_format}
+                TYPE = 'CSV'
+                TIMESTAMP_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.FF6Z'
+                FIELD_DELIMITER = '{delimiter}'
+                ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE""")
 
         file_formats_in_sf = query_fn(f"SHOW FILE FORMATS")
         self.logger.info(f"File formats in Snowflake: {file_formats_in_sf}")

@@ -236,7 +236,7 @@ class DbSync:
 
         self.schema_name = None
         self.grantees = None
-        self.file_format = FileFormat(self.connection_config['file_format'], self.query, file_format_type, self.logger)
+        self.file_format = FileFormat(self.connection_config['file_format'], self.query, file_format_type, self.logger, self.connection_config)
 
         if not self.connection_config.get('stage') and self.file_format.file_format_type == FileFormatTypes.PARQUET:
             self.logger.error("Table stages with Parquet file format is not supported. "
