@@ -27,7 +27,7 @@ class FileFormat:
     def __init__(self, file_format: str, query_fn: Callable, file_format_type: FileFormatTypes=None, logger = None, connection_config = None):
         """Find the file format in Snowflake, detect its type and
         initialise file format specific functions"""
-        auto_create_file_format = self.connection_config.get('auto_create_file_format', None)
+        auto_create_file_format = connection_config.get('auto_create_file_format', None)
 
         if file_format_type:
             self.file_format_type = file_format_type
