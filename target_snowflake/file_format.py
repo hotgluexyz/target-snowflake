@@ -52,7 +52,6 @@ class FileFormat:
                 TIMESTAMP_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.FF6Z'
                 FIELD_DELIMITER = '{delimiter}'
                 NULL_IF = ('null', 'NULL', '')
-                FIELD_OPTIONALLY_ENCLOSED_BY = '"'
                 EMPTY_FIELD_AS_NULL = TRUE
                 ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE""")
 
