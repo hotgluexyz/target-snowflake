@@ -92,7 +92,8 @@ def validate_config(config):
 
 def column_type(schema_property):
     """Take a specific schema property and return the snowflake equivalent column type"""
-    property_type = schema_property['type']
+    # TODO: Hard coding it to ignore fuzzy types and just use the first type
+    property_type = [schema_property['type'][0]]
     property_format = schema_property['format'] if 'format' in schema_property else None
     col_type = 'text'
     if 'object' in property_type or 'array' in property_type:
@@ -121,7 +122,7 @@ def column_type(schema_property):
 
 def column_trans(schema_property):
     """Generate SQL transformed columns syntax"""
-    property_type = schema_property['type']
+    property_type = [schema_property['type'][0]]
     col_trans = ''
     if 'object' in property_type or 'array' in property_type:
         col_trans = 'parse_json'
@@ -236,7 +237,7 @@ class DbSync:
 
         self.schema_name = None
         self.grantees = None
-        self.file_format = FileFormat(self.connection_config['file_format'], self.query, file_format_type, self.logger)
+        self.file_format = FileFormat(self.connection_config['file_format'], self.query, file_format_type, self.logger, self.connection_config)
 
         if not self.connection_config.get('stage') and self.file_format.file_format_type == FileFormatTypes.PARQUET:
             self.logger.error("Table stages with Parquet file format is not supported. "

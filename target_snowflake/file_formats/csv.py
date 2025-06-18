@@ -2,8 +2,6 @@
 import gzip
 import json
 import os
-import io
-import csv
 
 from typing import Callable, Dict, List
 from tempfile import mkstemp
@@ -61,31 +59,20 @@ def record_to_csv_line(record: dict,
     Returns:
         string of csv line
     """
-
-    # 1. Flatten nested objects as you already do
     flatten_record = flattening.flatten_record(record, schema, max_level=data_flattening_max_level)
 
-    # 2. Re-order by schema & normalise values
-    row =   [
-        (flatten_record[column] if type(flatten_record[column]) == str else json.dumps(flatten_record[column], ensure_ascii=False))
-        if column in flatten_record
-        else ""
-        for column in schema
-    ]
+    if delimiter == "\\x1F":
+        delimiter = '\x1F'
 
-
-    # 3. Let csv.writer handle quoting & escaping
-    buf = io.StringIO()
-    writer = csv.writer(
-        buf,
-        delimiter=delimiter,
-        quotechar='"',
-        escapechar='\\',
-        lineterminator='',   # we add our own \n later
-        quoting=csv.QUOTE_MINIMAL
+    # NOTE: All the entries need to be stringified to make the join work
+    return delimiter.join(
+        [
+            (flatten_record[column] if type(flatten_record[column]) == str else json.dumps(flatten_record[column], ensure_ascii=False))
+            if column in flatten_record
+            else ""
+            for column in schema
+        ]
     )
-    writer.writerow(row)
-    return buf.getvalue()
 
 
 def write_records_to_file(outfile,
