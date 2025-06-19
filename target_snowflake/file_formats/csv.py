@@ -67,7 +67,7 @@ def record_to_csv_line(record: dict,
     # NOTE: All the entries need to be stringified to make the join work
     return delimiter.join(
         [
-            (flatten_record[column] if type(flatten_record[column]) == str else json.dumps(flatten_record[column], ensure_ascii=False))
+            (flatten_record[column] if type(flatten_record[column]) == str else json.dumps(flatten_record[column], ensure_ascii=False).replace("\\", "/"))
             if column in flatten_record
             else ""
             for column in schema

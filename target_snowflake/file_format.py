@@ -53,6 +53,7 @@ class FileFormat:
                 FIELD_DELIMITER = '{delimiter}'
                 NULL_IF = ('null', 'NULL', '')
                 EMPTY_FIELD_AS_NULL = TRUE
+                ESCAPE = NONE
                 ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE""")
 
         file_formats_in_sf = query_fn(f"SHOW FILE FORMATS")
