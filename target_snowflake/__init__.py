@@ -462,7 +462,7 @@ def flush_records(stream: str,
                                                              compression=not no_compression,
                                                              dest_dir=temp_dir,
                                                              data_flattening_max_level=
-                                                             db_sync.data_flattening_max_level,                                                           
+                                                             db_sync.data_flattening_max_level,
                                                              delimiter=delimiter)
 
     # Get file stats

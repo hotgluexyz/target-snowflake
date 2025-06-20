@@ -75,7 +75,8 @@ def records_to_file(records: Dict,
                     prefix: str = 'batch_',
                     compression: bool = False,
                     dest_dir: str = None,
-                    data_flattening_max_level: int = 0):
+                    data_flattening_max_level: int = 0,
+                    delimiter: str = None):
     """
     Transforms a list of dictionaries with records messages to a parquet file
 
