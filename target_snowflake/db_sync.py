@@ -60,6 +60,10 @@ def validate_config(config):
 
     required_config_keys = []
 
+    # add default values to config, modifying the config in place
+    config['stage'] = config.get('stage') or f"{config['dbname']}.{config['default_target_schema']}.HG_STAGE"
+    config['file_format'] = config.get('file_format') or f"{config['dbname']}.{config['default_target_schema']}.HG_FILE_FORMAT"
+
     # Use external stages if both s3_bucket and stage defined
     if config.get('s3_bucket', None) and config.get('stage', None):
         required_config_keys = s3_required_config_keys
