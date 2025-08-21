@@ -60,12 +60,20 @@ def validate_config(config):
 
     required_config_keys = []
 
+    # add default values to config, modifying the config in place
+    config['stage'] = config.get('stage') or f"{config['dbname']}.{config['default_target_schema']}.HG_STAGE"
+    config['file_format'] = config.get('file_format') or f"{config['dbname']}.{config['default_target_schema']}.HG_FILE_FORMAT"
+
     # Use external stages if both s3_bucket and stage defined
     if config.get('s3_bucket', None) and config.get('stage', None):
         required_config_keys = s3_required_config_keys
     # Use table stage if none s3_bucket and stage defined
     elif not config.get('s3_bucket', None) and not config.get('stage', None):
         required_config_keys = snowflake_required_config_keys
+    # if only stage is provided and auto_stage_creation is enabled add stage to snowflake_required_config_keys
+    elif config.get("stage") and config.get("auto_stage_creation"):
+        required_config_keys = snowflake_required_config_keys
+        required_config_keys.append("stage")
     else:
         errors.append("Only one of 's3_bucket' or 'stage' keys defined in config. "
                       "Use both of them if you want to use an external stage when loading data into snowflake "
@@ -92,7 +100,8 @@ def validate_config(config):
 
 def column_type(schema_property):
     """Take a specific schema property and return the snowflake equivalent column type"""
-    property_type = schema_property['type']
+    # TODO: Hard coding it to ignore fuzzy types and just use the first type
+    property_type = [schema_property['type'][0]]
     property_format = schema_property['format'] if 'format' in schema_property else None
     col_type = 'text'
     if 'object' in property_type or 'array' in property_type:
@@ -121,7 +130,7 @@ def column_type(schema_property):
 
 def column_trans(schema_property):
     """Generate SQL transformed columns syntax"""
-    property_type = schema_property['type']
+    property_type = [schema_property['type'][0]]
     col_trans = ''
     if 'object' in property_type or 'array' in property_type:
         col_trans = 'parse_json'
@@ -212,6 +221,7 @@ class DbSync:
         self.connection_config = connection_config
         self.stream_schema_message = stream_schema_message
         self.table_cache = table_cache
+        self.stage_exists = None
 
         # logger to be used across the class's methods
         self.logger = get_logger('target_snowflake')
@@ -236,7 +246,7 @@ class DbSync:
 
         self.schema_name = None
         self.grantees = None
-        self.file_format = FileFormat(self.connection_config['file_format'], self.query, file_format_type, self.logger)
+        self.file_format = FileFormat(self.connection_config['file_format'], self.query, file_format_type, self.logger, self.connection_config)
 
         if not self.connection_config.get('stage') and self.file_format.file_format_type == FileFormatTypes.PARQUET:
             self.logger.error("Table stages with Parquet file format is not supported. "
@@ -307,6 +317,10 @@ class DbSync:
         # Use table stage
         else:
             self.upload_client = SnowflakeUploadClient(connection_config, self)
+            
+        # Create stage if specified (for both internal and external stages)
+        if connection_config.get('stage', None):
+            self.create_stage_if_not_exists()
 
     def refresh_token(self):
         """Connect to snowflake database"""
@@ -489,11 +503,68 @@ class DbSync:
     def put_to_stage(self, file, stream, count, temp_dir=None):
         """Upload file to snowflake stage"""
         self.logger.info('Uploading %d rows to stage', count)
+        
+        # Ensure stage exists before uploading
+        if self.connection_config.get('stage'):
+            self.create_stage_if_not_exists()
+            
         return self.upload_client.upload_file(file, stream, temp_dir)
 
     def delete_from_stage(self, stream, s3_key):
         """Delete file from snowflake stage"""
         self.upload_client.delete_object(stream, s3_key)
+
+    def create_stage_if_not_exists(self):
+        """Create the stage if it doesn't exist"""
+        stage_name = self.connection_config.get('stage')
+        if not stage_name:
+            return  # No stage specified
+        
+        if self.stage_exists:
+            return
+            
+        # Check if auto stage creation is enabled
+        if not self.connection_config.get('auto_stage_creation', False):
+            return
+            
+        # Parse stage name to get database, schema, and stage name (format: database.schema.stage_name)
+        stage_parts = stage_name.split('.')
+        if len(stage_parts) != 3:
+            self.logger.warning(f"Stage name '{stage_name}' is not in expected format 'database.schema.stage_name'. Skipping stage creation.")
+            return
+            
+        database_name, schema_name, stage_object_name = stage_parts
+        
+        # Check if stage exists using information_schema
+        check_stage_query = f"""
+        SELECT COUNT(*) as stage_count 
+        FROM {database_name}.information_schema.stages 
+        WHERE stage_schema = '{schema_name.upper()}' 
+        AND stage_name = '{stage_object_name.upper()}'
+        """
+        
+        try:
+            with self.open_connection() as connection:
+                with connection.cursor() as cur:
+                    cur.execute(check_stage_query)
+                    result = cur.fetchone()
+                    
+                    if result[0] == 0:
+                        # Stage doesn't exist, create it
+                        self.logger.info(f"Creating stage {stage_name}")
+                        
+                        # Create simple internal stage
+                        create_stage_sql = f"CREATE STAGE {stage_name}"
+                        
+                        cur.execute(create_stage_sql)
+                        self.logger.info(f"Successfully created stage {stage_name}")
+                        self.stage_exists = True
+                    else:
+                        self.logger.info(f"Stage {stage_name} already exists")
+                        
+        except Exception as e:
+            self.logger.warning(f"Could not create stage {stage_name}: {str(e)}")
+            raise e
 
     def copy_to_archive(self, s3_source_key, s3_archive_key, s3_archive_metadata):
         """

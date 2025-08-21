@@ -31,7 +31,7 @@ LOGGER = get_logger('target_snowflake')
 # Tone down snowflake.connector log noise by only outputting warnings and higher level messages
 logging.getLogger('snowflake.connector').setLevel(logging.WARNING)
 
-DEFAULT_BATCH_SIZE_ROWS = 100000
+DEFAULT_BATCH_SIZE_ROWS = 10_000
 DEFAULT_PARALLELISM = 0  # 0 The number of threads used to flush tables
 DEFAULT_MAX_PARALLELISM = 16  # Don't use more than this number of threads by default when flushing streams in parallel
 
@@ -462,7 +462,7 @@ def flush_records(stream: str,
                                                              compression=not no_compression,
                                                              dest_dir=temp_dir,
                                                              data_flattening_max_level=
-                                                             db_sync.data_flattening_max_level,                                                           
+                                                             db_sync.data_flattening_max_level,
                                                              delimiter=delimiter)
 
     # Get file stats
