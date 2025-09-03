@@ -116,7 +116,6 @@ Notes:
 * The `encryption` option is optional and used for client side encryption.
 * If you want client side encryption enabled you need to define the same master key in the target `config.json`.
 * Instead of `credentials` you can also use [storage_integration](https://docs.snowflake.com/en/sql-reference/sql/create-storage-integration.html)
-* **Auto Stage Creation**: The target connector can automatically create stages if they don't exist. This works for both internal stages (`CREATE STAGE schema.stage_name`) and external stages with S3. This feature is enabled by default but can be disabled by setting `disable_auto_stage_creation: true` in your config.json.
 
 Further details below in the Configuration settings section.
 
@@ -179,7 +178,6 @@ Full list of options in `config.json`:
 | archive_load_files                  | Boolean |            | (Default: False) When enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket` under the key `/{archive_load_files_s3_prefix}/{schema_name}/{table_name}/`. All archived files will have `tap`, `schema`, `table` and `archived-by` as S3 metadata keys. When incremental replication is used, the archived files will also have the following S3 metadata keys: `incremental-key`, `incremental-key-min` and `incremental-key-max`. 
 | archive_load_files_s3_prefix        | String  |            | (Default: "archive") When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.
 | archive_load_files_s3_bucket        | String  |            | (Default: Value of `s3_bucket`) When `archive_load_files` is enabled, the archived files will be placed in this bucket.
-| disable_auto_stage_creation         | Boolean |            | (Default: False) When set to true, disables automatic creation of external stages. By default, the connector will create the external stage if it doesn't exist when using external stages.
 
 ### To run tests:
 

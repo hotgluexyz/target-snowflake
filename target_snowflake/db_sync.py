@@ -71,7 +71,7 @@ def validate_config(config):
     elif not config.get('s3_bucket', None) and not config.get('stage', None):
         required_config_keys = snowflake_required_config_keys
     # if only stage is provided and auto_stage_creation is enabled add stage to snowflake_required_config_keys
-    elif config.get("stage") and config.get("auto_stage_creation"):
+    elif config.get("stage"):
         required_config_keys = snowflake_required_config_keys
         required_config_keys.append("stage")
     else:
@@ -521,10 +521,6 @@ class DbSync:
             return  # No stage specified
         
         if self.stage_exists:
-            return
-            
-        # Check if auto stage creation is enabled
-        if not self.connection_config.get('auto_stage_creation', False):
             return
             
         # Parse stage name to get database, schema, and stage name (format: database.schema.stage_name)

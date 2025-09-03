@@ -27,15 +27,12 @@ class FileFormat:
     def __init__(self, file_format: str, query_fn: Callable, file_format_type: FileFormatTypes=None, logger = None, connection_config = None):
         """Find the file format in Snowflake, detect its type and
         initialise file format specific functions"""
-        auto_create_file_format = connection_config.get('auto_create_file_format', None)
 
         if file_format_type:
             self.file_format_type = file_format_type
-        elif auto_create_file_format:
-            self.file_format_type = FileFormatTypes.CSV
         else:
-            # Detect file format type by querying it from Snowflake
-            self.file_format_type = self._detect_file_format_type(file_format, query_fn)
+            # use CSV as default file format type
+            self.file_format_type = FileFormatTypes.CSV
 
         self.formatter = self._get_formatter(self.file_format_type)
         self.logger = logger
@@ -45,8 +42,13 @@ class FileFormat:
         if delimiter == "\\x1F":
             delimiter = '\x1F'
 
-        if auto_create_file_format:
-            self.logger.info(f"Auto creating file format: {file_format}")
+        # check if file_format exists
+        file_formats_in_sf = query_fn(f"SHOW FILE FORMATS")
+        self.logger.info(f"File formats in Snowflake: {file_formats_in_sf}")
+
+        existing_file_format = next((fmt for fmt in file_formats_in_sf if fmt['name'] == file_format.split('.')[-1]), None)
+        if len(existing_file_format) == 0:
+            self.logger.info(f"Format '{file_format}' not found, Auto creating file format")
             query_fn(f"""CREATE OR REPLACE FILE FORMAT {file_format}
                 TYPE = 'CSV'
                 TIMESTAMP_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.FF6Z'
@@ -55,9 +57,10 @@ class FileFormat:
                 EMPTY_FIELD_AS_NULL = TRUE
                 ESCAPE = NONE
                 ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE""")
-
-        file_formats_in_sf = query_fn(f"SHOW FILE FORMATS")
-        self.logger.info(f"File formats in Snowflake: {file_formats_in_sf}")
+            self.logger.info(f"File format '{file_format}' created")
+        else:
+            # if file format exists, detect its type
+            self.file_format_type = self._detect_file_format_type(file_format, query_fn)
 
     @classmethod
     def _get_formatter(cls, file_format_type: FileFormatTypes) -> ModuleType:
