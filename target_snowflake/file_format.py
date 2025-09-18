@@ -47,7 +47,7 @@ class FileFormat:
         self.logger.info(f"File formats in Snowflake: {file_formats_in_sf}")
 
         existing_file_format = next((fmt for fmt in file_formats_in_sf if fmt['name'] == file_format.split('.')[-1]), None)
-        if len(existing_file_format) == 0:
+        if not file_formats_in_sf:
             self.logger.info(f"Format '{file_format}' not found, Auto creating file format")
             query_fn(f"""CREATE OR REPLACE FILE FORMAT {file_format}
                 TYPE = 'CSV'
