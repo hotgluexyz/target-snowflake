@@ -269,7 +269,7 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
                 #  1) Set ` 'primary_key_required': false ` in the target-snowflake config.json
                 #  or
                 #  2) Use fastsync [postgres-to-snowflake, mysql-to-snowflake, etc.]
-                if config.get('primary_key_required', True) and len(o['key_properties']) == 0:
+                if config.get('primary_key_required') and len(o['key_properties']) == 0:
                     LOGGER.critical('Primary key is set to mandatory but not defined in the [%s] stream', stream)
                     raise Exception("key_properties field is required")
 
