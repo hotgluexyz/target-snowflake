@@ -85,7 +85,7 @@ def get_snowflake_statics(config):
 
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements,invalid-name
-def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatTypes = None, delimiter = ",") -> None:
+def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatTypes = None, delimiter = "\\x1F") -> None:
     """Main loop to read and consume singer messages from stdin
 
     Params:
@@ -388,7 +388,7 @@ def flush_streams(
             no_compression=config.get('no_compression'),
             delete_rows=config.get('hard_delete'),
             temp_dir=config.get('temp_dir'),
-            delimiter=config.get('delimiter', ","),
+            delimiter=config.get('delimiter', "\\x1F"),
             archive_load_files=copy.copy(archive_load_files_data.get(stream, None))
         ) for stream in streams_to_flush)
 
@@ -419,7 +419,7 @@ def flush_streams(
 
 
 def load_stream_batch(stream, records, row_count, db_sync, no_compression=False, delete_rows=False,
-                      temp_dir=None, delimiter=",", archive_load_files=None, ):
+                      temp_dir=None, delimiter="\\x1F", archive_load_files=None, ):
     """Load one batch of the stream into target table"""
     # Load into snowflake
     if row_count[stream] > 0:
@@ -439,7 +439,7 @@ def flush_records(stream: str,
                   temp_dir: str = None,
                   no_compression: bool = False,
                   archive_load_files: Dict = None,
-                  delimiter=",") -> None:
+                  delimiter="\\x1F") -> None:
     """
     Takes a list of record messages and loads it into the snowflake target table
 

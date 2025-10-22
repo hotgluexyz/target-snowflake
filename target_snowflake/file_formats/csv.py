@@ -106,7 +106,7 @@ def records_to_file(records: Dict,
                     compression: bool = False,
                     dest_dir: str = None,
                     data_flattening_max_level: int = 0,
-                    delimiter=","):
+                    delimiter="\\x1F"):
     """
     Transforms a list of dictionaries with records messages to a CSV file
 
