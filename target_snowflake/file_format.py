@@ -2,6 +2,7 @@
 from enum import Enum, unique
 from types import ModuleType
 from typing import Callable
+import json
 
 import target_snowflake.file_formats
 from target_snowflake.exceptions import FileFormatNotFoundException, InvalidFileFormatException
@@ -59,6 +60,10 @@ class FileFormat:
                 ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE""")
             self.logger.info(f"File format '{file_format}' created")
         else:
+            existing_file_format_delimiter = json.loads(existing_file_format['format_options'])['FIELD_DELIMITER']
+            if existing_file_format_delimiter!= delimiter:
+                query_fn(f"""CREATE OR REPLACE FILE FORMAT {file_format} TYPE = 'CSV' FIELD_DELIMITER = '{delimiter}';""")
+                self.logger.info(f"File format '{file_format}' delimiter updated from '{existing_file_format_delimiter}' to '{delimiter}'")
             # if file format exists, detect its type
             self.file_format_type = self._detect_file_format_type(file_format, query_fn)
 
