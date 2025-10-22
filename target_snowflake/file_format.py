@@ -38,7 +38,7 @@ class FileFormat:
         self.formatter = self._get_formatter(self.file_format_type)
         self.logger = logger
         self.connection_config = connection_config
-        delimiter = self.connection_config.get('delimiter', ',')
+        delimiter = self.connection_config.get('delimiter', '\\x1F')
 
         if delimiter == "\\x1F":
             delimiter = '\x1F'
