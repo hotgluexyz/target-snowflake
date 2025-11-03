@@ -8,19 +8,30 @@ from tempfile import mkstemp
 from target_snowflake import flattening
 
 
-def create_copy_sql(table_name: str,
-                    stage_name: str,
-                    s3_key: str,
-                    file_format_name: str,
-                    columns: List):
-    """Generate a Parquet compatible snowflake COPY INTO command"""
+def create_copy_sql(
+    table_name: str,
+    stage_name: str,
+    s3_keys: List[str],
+    file_format_name: str,
+    columns: List
+) -> str:
+    """
+    Generate a Snowflake COPY INTO command for Parquet files.
+    Assumes s3_keys is a list of file names.
+    """
+    # Join column names for the COPY target clause
     p_target_columns = ', '.join([c['name'] for c in columns])
-    p_source_columns = ', '.join([f"{c['trans']}($1:{c['json_element_name']}) {c['name']}"
-                                  for i, c in enumerate(columns)])
 
-    return f"COPY INTO {table_name} ({p_target_columns}) " \
-           f"FROM (SELECT {p_source_columns} FROM '@{stage_name}/{s3_key}') " \
-           f"FILE_FORMAT = (format_name='{file_format_name}')"
+
+    # Format file list for FILES clause
+    file_list = ', '.join([f"'{key}'" for key in s3_keys])
+
+    return (
+        f"COPY INTO {table_name}"
+        f"FROM @{stage_name} FILES = ({file_list}) "
+        f"FILE_FORMAT = (format_name='{file_format_name}') "
+        f"MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE"
+    )
 
 
 def create_merge_sql(table_name: str,

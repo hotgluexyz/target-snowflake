@@ -468,53 +468,23 @@ def flush_records(stream: str,
     #                                                          delimiter=delimiter)
 
 
-
+    staged_files = []
     for file in os.listdir(temp_dir):
-        if not file.startswith(stream):
+        if not file.split("-")[0] == stream:
             continue
 
         filepath = f"{temp_dir}/{file}"
 
         # Get file stats
-        row_count = len(records)
         size_bytes = os.path.getsize(filepath)
 
         # Upload to s3 and load into Snowflake
-        s3_key = db_sync.put_to_stage(filepath, stream, row_count, temp_dir=temp_dir)
-        db_sync.load_file(s3_key, row_count, size_bytes)
+        s3_key = db_sync.put_to_stage(filepath, stream, 1, temp_dir=temp_dir)
+        staged_files.append(s3_key)
+    
+    db_sync.load_file(staged_files, 100, size_bytes)
 
-        # Delete file from local disk
-        # os.remove(filepath)
-
-        if archive_load_files:
-            stream_name_parts = stream_utils.stream_name_to_dict(stream)
-            if 'schema_name' not in stream_name_parts or 'table_name' not in stream_name_parts:
-                raise Exception(f"Failed to extract schema and table names from stream '{stream}'")
-
-            archive_schema = stream_name_parts['schema_name']
-            archive_table = stream_name_parts['table_name']
-            archive_tap = archive_load_files['tap']
-
-            archive_metadata = {
-                'tap': archive_tap,
-                'schema': archive_schema,
-                'table': archive_table,
-                'archived-by': 'pipelinewise_target_snowflake'
-            }
-
-            if 'column' in archive_load_files:
-                archive_metadata.update({
-                    'incremental-key': archive_load_files['column'],
-                    'incremental-key-min': str(archive_load_files['min']),
-                    'incremental-key-max': str(archive_load_files['max'])
-                })
-
-            # Use same file name as in import
-            archive_file = os.path.basename(s3_key)
-            archive_key = f"{archive_tap}/{archive_table}/{archive_file}"
-
-            db_sync.copy_to_archive(s3_key, archive_key, archive_metadata)
-
+    for s3_key in staged_files:
         # Delete file from S3
         db_sync.delete_from_stage(stream, s3_key)
 
