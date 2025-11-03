@@ -389,7 +389,7 @@ def flush_streams(
             db_sync=stream_to_sync[stream],
             no_compression=config.get('no_compression'),
             delete_rows=config.get('hard_delete'),
-            temp_dir=config.get('temp_dir'),
+            temp_dir=config.get('input_path'),
             delimiter=config.get('delimiter', "\x2C"),
             archive_load_files=copy.copy(archive_load_files_data.get(stream, None))
         ) for stream in stream_to_sync.keys())
@@ -468,7 +468,9 @@ def flush_records(stream: str,
     #                                                          delimiter=delimiter)
 
 
-    filepath = f"{stream}.parquet"
+
+
+    filepath = f"{temp_dir}/{stream}.parquet"
 
     # Get file stats
     row_count = len(records)
