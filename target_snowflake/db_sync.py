@@ -604,7 +604,7 @@ class DbSync:
     def load_file(self, s3_key, count, size_bytes):
         """Load a supported file type from snowflake stage into target table"""
         stream = self.stream_schema_message['stream']
-        self.logger.info("Loading %d rows into '%s'", count, self.table_name(stream, False))
+        self.logger.info("Loading rows into '%s'", self.table_name(stream, False))
 
         # Get list if columns with types
         columns_with_trans = [
