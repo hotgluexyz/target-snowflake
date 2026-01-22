@@ -469,8 +469,9 @@ def flush_records(stream: str,
 
 
     staged_files = []
+    size_bytes = 0
     for file in os.listdir(temp_dir):
-        if not file.split("-")[0] == stream:
+        if not file == f"{stream}.parquet":
             continue
 
         filepath = f"{temp_dir}/{file}"

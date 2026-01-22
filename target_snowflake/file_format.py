@@ -50,7 +50,7 @@ class FileFormat:
         existing_file_format = next((fmt for fmt in file_formats_in_sf if fmt['name'] == file_format.split('.')[-1]), None)
         if not existing_file_format:
             self.logger.info(f"Format '{file_format}' not found, Auto creating file format")
-            query_fn(f"""CREATE OR REPLACE FILE FORMAT TESTPARQUET.PUBLIC.HG_FILE_FORMAT
+            query_fn(f"""CREATE OR REPLACE FILE FORMAT TEST_PARQUET.PUBLIC.HG_FILE_FORMAT
                     TYPE = 'PARQUET'
                     COMPRESSION = 'AUTO';
                     """)
