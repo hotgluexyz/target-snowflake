@@ -50,22 +50,20 @@ class FileFormat:
         existing_file_format = next((fmt for fmt in file_formats_in_sf if fmt['name'] == file_format.split('.')[-1]), None)
         if not existing_file_format:
             self.logger.info(f"Format '{file_format}' not found, Auto creating file format")
-            query_fn(f"""CREATE OR REPLACE FILE FORMAT {file_format}
-                TYPE = 'CSV'
-                TIMESTAMP_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.FF6Z'
-                FIELD_DELIMITER = '{delimiter}'
-                NULL_IF = ('null', 'NULL', '')
-                EMPTY_FIELD_AS_NULL = TRUE
-                ESCAPE = NONE
-                ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE""")
+            query_fn(f"""CREATE OR REPLACE FILE FORMAT TEST_PARQUET.PUBLIC.HG_FILE_FORMAT
+                    TYPE = 'PARQUET'
+                    COMPRESSION = 'AUTO';
+                    """)
             self.logger.info(f"File format '{file_format}' created")
         else:
-            existing_file_format_delimiter = json.loads(existing_file_format['format_options'])['FIELD_DELIMITER']
-            if existing_file_format_delimiter!= delimiter:
-                query_fn(f"""CREATE OR REPLACE FILE FORMAT {file_format} TYPE = 'CSV' FIELD_DELIMITER = '{delimiter}';""")
-                self.logger.info(f"File format '{file_format}' delimiter updated from '{existing_file_format_delimiter}' to '{delimiter}'")
+            if existing_file_format['type'] == 'CSV':
+                existing_file_format_delimiter = json.loads(existing_file_format['format_options'])['FIELD_DELIMITER']
+                if existing_file_format_delimiter!= delimiter:
+                    query_fn(f"""CREATE OR REPLACE FILE FORMAT {file_format} TYPE = 'CSV' FIELD_DELIMITER = '{delimiter}';""")
+                    self.logger.info(f"File format '{file_format}' delimiter updated from '{existing_file_format_delimiter}' to '{delimiter}'")
             # if file format exists, detect its type
             self.file_format_type = self._detect_file_format_type(file_format, query_fn)
+
 
     @classmethod
     def _get_formatter(cls, file_format_type: FileFormatTypes) -> ModuleType:

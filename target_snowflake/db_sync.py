@@ -601,10 +601,10 @@ class DbSync:
         table_name = self.table_name(stream, False, without_schema=True)
         return f"{self.schema_name}.%{table_name}"
 
-    def load_file(self, s3_key, count, size_bytes):
+    def load_file(self, s3_keys, count, size_bytes):
         """Load a supported file type from snowflake stage into target table"""
         stream = self.stream_schema_message['stream']
-        self.logger.info("Loading %d rows into '%s'", count, self.table_name(stream, False))
+        self.logger.info("Loading rows into '%s'", self.table_name(stream, False))
 
         # Get list if columns with types
         columns_with_trans = [
@@ -638,8 +638,8 @@ class DbSync:
         else:
             try:
                 inserts, updates = (
-                    self._load_file_copy(
-                        s3_key=s3_key,
+                    self._load_files_copy(
+                        s3_keys=s3_keys,
                         stream=stream,
                         columns_with_trans=columns_with_trans
                     ),
@@ -681,7 +681,7 @@ class DbSync:
                     updates = results[0].get('number of rows updated', 0)
         return inserts, updates
 
-    def _load_file_copy(self, s3_key, stream, columns_with_trans) -> int:
+    def _load_files_copy(self, s3_keys, stream, columns_with_trans) -> int:
         # COPY does insert only
         inserts = 0
         with self.open_connection() as connection:
@@ -689,7 +689,7 @@ class DbSync:
                 copy_sql = self.file_format.formatter.create_copy_sql(
                     table_name=self.table_name(stream, False),
                     stage_name=self.get_stage_name(stream),
-                    s3_key=s3_key,
+                    s3_keys=s3_keys,
                     file_format_name=self.connection_config['file_format'],
                     columns=columns_with_trans
                 )
