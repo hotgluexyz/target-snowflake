@@ -75,16 +75,31 @@ class TestParquet(unittest.TestCase):
                                                       {'name': 'COL_1', 'json_element_name': 'col_1', 'trans': ''},
                                                       {'name': 'COL_2', 'json_element_name': 'colTwo', 'trans': ''},
                                                       {'name': 'COL_3', 'json_element_name': 'col_3',
-                                                       'trans': 'parse_json'}
+                                                       'trans': 'parse_json'},
+                                                      {'name': 'COL_4', 'json_element_name': '"CreatedDate"',
+                                                       'trans': '', 'format': 'date-time'},
                                                   ],
                                                   pk_merge_condition='s.COL_1 = t.COL_1'),
 
                          "MERGE INTO foo_table t USING ("
-                         "SELECT ($1:col_1) COL_1, ($1:colTwo) COL_2, parse_json($1:col_3) COL_3 "
+                         "SELECT ($1:col_1) COL_1, ($1:colTwo) COL_2, parse_json($1:col_3) COL_3, "
+                         "TO_TIMESTAMP_NTZ($1:\"CreatedDate\"::NUMBER, 3) COL_4 "
                          "FROM '@foo_stage/foo_s3_key.parquet' "
                          "(FILE_FORMAT => 'foo_file_format')) s "
                          "ON s.COL_1 = t.COL_1 "
-                         "WHEN MATCHED THEN UPDATE SET COL_1=s.COL_1, COL_2=s.COL_2, COL_3=s.COL_3 "
+                         "WHEN MATCHED THEN UPDATE SET COL_1=s.COL_1, COL_2=s.COL_2, COL_3=s.COL_3, COL_4=s.COL_4 "
                          "WHEN NOT MATCHED THEN "
-                         "INSERT (COL_1, COL_2, COL_3) "
-                         "VALUES (s.COL_1, s.COL_2, s.COL_3)")
+                         "INSERT (COL_1, COL_2, COL_3, COL_4) "
+                         "VALUES (s.COL_1, s.COL_2, s.COL_3, s.COL_4)")
+
+    def test_parquet_source_column_datetime(self):
+        column = {
+            'name': '"CREATEDDATE"',
+            'json_element_name': '"CreatedDate"',
+            'trans': '',
+            'format': 'date-time',
+        }
+        self.assertEqual(
+            parquet.parquet_source_column(column),
+            'TO_TIMESTAMP_NTZ($1:"CreatedDate"::NUMBER, 3) "CREATEDDATE"',
+        )

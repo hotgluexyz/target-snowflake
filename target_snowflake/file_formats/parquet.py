@@ -7,6 +7,21 @@ from tempfile import mkstemp
 
 from target_snowflake import flattening
 
+PARQUET_TIMESTAMP_MS_SCALE = 3
+
+
+def parquet_source_column(column: Dict) -> str:
+    """Build a SELECT expression for one column when reading staged parquet via $1."""
+    elem = column['json_element_name']
+    name = column['name']
+    trans = column['trans']
+
+    if column.get('format') == 'date-time':
+        return f'TO_TIMESTAMP_NTZ($1:{elem}::NUMBER, {PARQUET_TIMESTAMP_MS_SCALE}) {name}'
+    if trans:
+        return f'{trans}($1:{elem}) {name}'
+    return f'($1:{elem}) {name}'
+
 
 def create_copy_sql(
     table_name: str,
@@ -41,8 +56,7 @@ def create_merge_sql(table_name: str,
                      columns: List,
                      pk_merge_condition: str) -> str:
     """Generate a Parquet compatible snowflake MERGE INTO command"""
-    p_source_columns = ', '.join([f"{c['trans']}($1:{c['json_element_name']}) {c['name']}"
-                                  for i, c in enumerate(columns)])
+    p_source_columns = ', '.join(parquet_source_column(c) for c in columns)
     p_update = ', '.join([f"{c['name']}=s.{c['name']}" for c in columns])
     p_insert_cols = ', '.join([c['name'] for c in columns])
     p_insert_values = ', '.join([f"s.{c['name']}" for c in columns])

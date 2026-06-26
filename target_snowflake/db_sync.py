@@ -611,7 +611,8 @@ class DbSync:
             {
                 "name": safe_column_name(name),
                 "json_element_name": json_element_name(name),
-                "trans": column_trans(schema)
+                "trans": column_trans(schema),
+                "format": schema.get('format'),
             }
             for (name, schema) in self.flatten_schema.items()
         ]
