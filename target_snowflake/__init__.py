@@ -470,7 +470,8 @@ def flush_records(stream: str,
 
     staged_files = []
     for file in os.listdir(temp_dir):
-        if not file.split("-")[0] == stream:
+        file_stem = os.path.splitext(file)[0]
+        if file_stem != stream and file.split("-")[0] != stream:
             continue
 
         filepath = f"{temp_dir}/{file}"

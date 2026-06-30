@@ -611,7 +611,8 @@ class DbSync:
             {
                 "name": safe_column_name(name),
                 "json_element_name": json_element_name(name),
-                "trans": column_trans(schema)
+                "trans": column_trans(schema),
+                "format": schema.get('format'),
             }
             for (name, schema) in self.flatten_schema.items()
         ]
@@ -622,11 +623,14 @@ class DbSync:
         # Insert or Update with MERGE command if primary key defined
         if len(self.stream_schema_message['key_properties']) > 0:
             try:
-                inserts, updates = self._load_file_merge(
-                    s3_key=s3_key,
-                    stream=stream,
-                    columns_with_trans=columns_with_trans
-                )
+                for s3_key in s3_keys:
+                    file_inserts, file_updates = self._load_file_merge(
+                        s3_key=s3_key,
+                        stream=stream,
+                        columns_with_trans=columns_with_trans
+                    )
+                    inserts += file_inserts
+                    updates += file_updates
             except Exception as ex:
                 self.logger.error(
                     'Error while executing MERGE query for table "%s" in stream "%s"',
