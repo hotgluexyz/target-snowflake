@@ -85,7 +85,7 @@ def get_snowflake_statics(config):
 
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements,invalid-name
-def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatTypes = None, delimiter = "\\x1F") -> None:
+def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatTypes = None, delimiter = "\x2C") -> None:
     """Main loop to read and consume singer messages from stdin
 
     Params:
@@ -201,7 +201,7 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
 
             if flush:
                 # flush all streams, delete records if needed, reset counts and then emit current state
-                if config.get('flush_all_streams'):
+                if config.get('flush_all_streams', True):
                     filter_streams = None
                 else:
                     filter_streams = [stream]
@@ -241,7 +241,7 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
                 # so previous records need to be flushed
                 if row_count.get(stream, 0) > 0:
                     # flush all streams, delete records if needed, reset counts and then emit current state
-                    if config.get('flush_all_streams'):
+                    if config.get('flush_all_streams', True):
                         filter_streams = None
                     else:
                         filter_streams = [stream]
@@ -326,7 +326,7 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
 
     # if some bucket has records that need to be flushed but haven't reached batch size
     # then flush all buckets.
-    if sum(row_count.values()) > 0:
+    if row_count.values():
         # flush all streams one last time, delete records if needed, reset counts and then emit current state
         flushed_state = flush_streams(records_to_load, row_count, stream_to_sync, config, state, flushed_state,
                                       archive_load_files_data)
@@ -378,19 +378,21 @@ def flush_streams(
     else:
         streams_to_flush = streams.keys()
 
+    parallelism = 1
+
     # Single-host, thread-based parallelism
     with parallel_backend('threading', n_jobs=parallelism):
         Parallel()(delayed(load_stream_batch)(
             stream=stream,
-            records=streams[stream],
+            records=stream,
             row_count=row_count,
             db_sync=stream_to_sync[stream],
             no_compression=config.get('no_compression'),
             delete_rows=config.get('hard_delete'),
-            temp_dir=config.get('temp_dir'),
-            delimiter=config.get('delimiter', "\\x1F"),
+            temp_dir=config.get('input_path'),
+            delimiter=config.get('delimiter', "\x2C"),
             archive_load_files=copy.copy(archive_load_files_data.get(stream, None))
-        ) for stream in streams_to_flush)
+        ) for stream in stream_to_sync.keys())
 
     # reset flushed stream records to empty to avoid flushing same records
     for stream in streams_to_flush:
@@ -419,10 +421,10 @@ def flush_streams(
 
 
 def load_stream_batch(stream, records, row_count, db_sync, no_compression=False, delete_rows=False,
-                      temp_dir=None, delimiter="\\x1F", archive_load_files=None, ):
+                      temp_dir=None, delimiter="\x2C", archive_load_files=None, ):
     """Load one batch of the stream into target table"""
     # Load into snowflake
-    if row_count[stream] > 0:
+    if True:
         flush_records(stream, records, db_sync, temp_dir, no_compression, archive_load_files, delimiter)
 
         # Delete soft-deleted, flagged rows - where _sdc_deleted at is not null
@@ -439,7 +441,7 @@ def flush_records(stream: str,
                   temp_dir: str = None,
                   no_compression: bool = False,
                   archive_load_files: Dict = None,
-                  delimiter="\\x1F") -> None:
+                  delimiter="\x2C") -> None:
     """
     Takes a list of record messages and loads it into the snowflake target table
 
@@ -457,56 +459,35 @@ def flush_records(stream: str,
         None
     """
     # Generate file on disk in the required format
-    filepath = db_sync.file_format.formatter.records_to_file(records,
-                                                             db_sync.flatten_schema,
-                                                             compression=not no_compression,
-                                                             dest_dir=temp_dir,
-                                                             data_flattening_max_level=
-                                                             db_sync.data_flattening_max_level,
-                                                             delimiter=delimiter)
+    # filepath = db_sync.file_format.formatter.records_to_file(records,
+    #                                                          db_sync.flatten_schema,
+    #                                                          compression=not no_compression,
+    #                                                          dest_dir=temp_dir,
+    #                                                          data_flattening_max_level=
+    #                                                          db_sync.data_flattening_max_level,
+    #                                                          delimiter=delimiter)
 
-    # Get file stats
-    row_count = len(records)
-    size_bytes = os.path.getsize(filepath)
 
-    # Upload to s3 and load into Snowflake
-    s3_key = db_sync.put_to_stage(filepath, stream, row_count, temp_dir=temp_dir)
-    db_sync.load_file(s3_key, row_count, size_bytes)
+    staged_files = []
+    for file in os.listdir(temp_dir):
+        file_stem = os.path.splitext(file)[0]
+        if file_stem != stream and file.split("-")[0] != stream:
+            continue
 
-    # Delete file from local disk
-    os.remove(filepath)
+        filepath = f"{temp_dir}/{file}"
 
-    if archive_load_files:
-        stream_name_parts = stream_utils.stream_name_to_dict(stream)
-        if 'schema_name' not in stream_name_parts or 'table_name' not in stream_name_parts:
-            raise Exception(f"Failed to extract schema and table names from stream '{stream}'")
+        # Get file stats
+        size_bytes = os.path.getsize(filepath)
 
-        archive_schema = stream_name_parts['schema_name']
-        archive_table = stream_name_parts['table_name']
-        archive_tap = archive_load_files['tap']
+        # Upload to s3 and load into Snowflake
+        s3_key = db_sync.put_to_stage(filepath, stream, 1, temp_dir=temp_dir)
+        staged_files.append(s3_key)
+    
+    db_sync.load_file(staged_files, 100, size_bytes)
 
-        archive_metadata = {
-            'tap': archive_tap,
-            'schema': archive_schema,
-            'table': archive_table,
-            'archived-by': 'pipelinewise_target_snowflake'
-        }
-
-        if 'column' in archive_load_files:
-            archive_metadata.update({
-                'incremental-key': archive_load_files['column'],
-                'incremental-key-min': str(archive_load_files['min']),
-                'incremental-key-max': str(archive_load_files['max'])
-            })
-
-        # Use same file name as in import
-        archive_file = os.path.basename(s3_key)
-        archive_key = f"{archive_tap}/{archive_table}/{archive_file}"
-
-        db_sync.copy_to_archive(s3_key, archive_key, archive_metadata)
-
-    # Delete file from S3
-    db_sync.delete_from_stage(stream, s3_key)
+    for s3_key in staged_files:
+        # Delete file from S3
+        db_sync.delete_from_stage(stream, s3_key)
 
 
 def main():
