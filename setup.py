@@ -22,6 +22,7 @@ setup(name="pipelinewise-target-snowflake",
       py_modules=["target_snowflake"],
       python_requires='>=3.7',
       install_requires=[
+          'certifi==2022.9.24',
           'pipelinewise-singer-python==1.*',
           'oscrypto @ git+https://github.com/wbond/oscrypto.git@d5f3437ed24257895ae1edd9e503cfb352e635a8',
            'numpy<1.24.0', 
